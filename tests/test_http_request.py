@@ -64,9 +64,9 @@ class RequestTest(unittest.TestCase):
         h = Headers({'key1': u'val1', u'key2': 'val2'})
         h[u'newkey'] = u'newval'
         for k, v in h.iteritems():
-            self.assert_(isinstance(k, bytes))
+            self.assertIsInstance(k, bytes)
             for s in v:
-                self.assert_(isinstance(s, bytes))
+                self.assertIsInstance(s, bytes)
 
     def test_eq(self):
         url = 'http://www.scrapy.org'
@@ -234,6 +234,26 @@ class RequestTest(unittest.TestCase):
         r = self.request_class("http://example.com")
         self.assertRaises(AttributeError, setattr, r, 'url', 'http://example2.com')
         self.assertRaises(AttributeError, setattr, r, 'body', 'xxx')
+
+    def test_callback_is_callable(self):
+        def a_function():
+            pass
+        r = self.request_class('http://example.com')
+        self.assertIsNone(r.callback)
+        r = self.request_class('http://example.com', a_function)
+        self.assertIs(r.callback, a_function)
+        with self.assertRaises(TypeError):
+            self.request_class('http://example.com', 'a_function')
+
+    def test_errback_is_callable(self):
+        def a_function():
+            pass
+        r = self.request_class('http://example.com')
+        self.assertIsNone(r.errback)
+        r = self.request_class('http://example.com', a_function, errback=a_function)
+        self.assertIs(r.errback, a_function)
+        with self.assertRaises(TypeError):
+            self.request_class('http://example.com', a_function, errback='a_function')
 
 
 class FormRequestTest(RequestTest):
@@ -522,6 +542,16 @@ class FormRequestTest(RequestTest):
             <input type="submit" name="i3" value="i3v">
             </form>""")
         req = self.request_class.from_response(response, dont_click=True)
+        fs = _qs(req)
+        self.assertEqual(fs, {b'i1': [b'i1v'], b'i2': [b'i2v']})
+    
+    def test_from_response_clickdata_does_not_ignore_image(self):
+        response = _buildresponse(
+            """<form>
+            <input type="text" name="i1" value="i1v">
+            <input id="image" name="i2" type="image" value="i2v" alt="Login" src="http://my.image.org/1.jpg">
+            </form>""")
+        req = self.request_class.from_response(response)
         fs = _qs(req)
         self.assertEqual(fs, {b'i1': [b'i1v'], b'i2': [b'i2v']})
 
